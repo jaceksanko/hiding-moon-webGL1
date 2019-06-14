@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Cube Mapping</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body style='margin: 0'>
+	<canvas id="canvas"></canvas>
+	<canvas id="cool_canvas" width="2048" height="2048"></canvas>
+	<div id="uiContainer">
+		<div id="ui">
+			<div id="moon-size-change"></div>
+			<div id="moon-move-left-right"></div>
+			<div id="moon-move-up-down"></div>
+			<h3>Blend moon RGB</h3>
+			<div id="moonLessR"></div>
+			<div id="moonMoreR"></div>
+			<div id="moonLessG"></div>
+			<div id="moonMoreG"></div>
+			<div id="moonLessB"></div>
+			<div id="moonMoreB"></div>
+
+			<h3>Blend moon if ... lake RGB</h3>
+			<div id="lakeLessR"></div>
+			<div id="lakeMoreR"></div>
+			<div id="lakeLessG"></div>
+			<div id="lakeMoreG"></div>
+			<div id="lakeLessB"></div>
+			<div id="lakeMoreB"></div>
+
+			<h3>Zoom image</h3>
+			<div id="zoom"></div>
+		</div>
+	</div>
+	<script type="text/javascript" src="libs.js"></script>
+	<script type="module" src="moonAndLake.js"></script>
+	<script type="module" src="script.js"></script>
+
+
+</body>
+</html>

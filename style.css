@@ -1,0 +1,71 @@
+html {
+	border: 0;
+	overflow:hidden;
+}
+#canvas {
+	width: 100vw;
+	height: 100vh;
+	display: block;
+}
+
+#cool_canvas {
+	display: none;
+}
+
+#uiContainer {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	z-index: 3;
+	font-family: monospace;
+	pointer-events: none;
+
+
+	text-shadow:
+		-1px -1px 0 #FFF,
+		1px -1px 0 #FFF,
+		-1px 1px 0 #FFF,
+		1px 1px 0 #FFF;
+}
+
+#ui {
+	opacity: 0.8;
+	width: 200px;
+}
+
+#ui>div {
+	pointer-events: none;
+}
+#ui input, #ui select, #ui option, #ui canvas {
+	pointer-events: auto;
+}
+
+.widget-label {
+	font-size: small;
+	min-width: 10em;
+	text-align: right;
+}
+
+.widget-value {
+	float: right;
+	font-size: small;
+	order: 1;
+	min-width: 3em;
+}
+
+.widget-outer {
+	float: right;
+	display: flex;
+	align-items: center;
+	height: 1.7em;
+}
+.widget-slider {
+	opacity: 0.5;
+	font-size: large;
+	margin-left: .3em;
+	margin-right: .3em;
+}
+
+#moon-move-left-right .widget-slider {
+	direction: rtl;
+}
