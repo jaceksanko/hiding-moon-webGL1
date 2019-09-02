@@ -1,153 +1,73 @@
 "use strict";
-import { mainCube, THETA, PHI, old_x, old_y } from './script.js';
+import {mainCube, old_x, old_y, PHI, THETA} from './script.js';
+import {loadImagesAndShaders} from './pureFunctions/loadImagesAndShaders.js'
+import createCanvas from './pureFunctions/webGL/creteCanvas.js'
+import {getProgram} from "./pureFunctions/webGL/programs.js";
+import sizeSquareImage from "./pureFunctions/sizeSquareImage.js";
+import TexImage2dOptions from "./classes/TexImage2dOptions.js";
+import TexParameteriOptions from "./classes/TexParameteriOptions.js";
+import TexturesPixelStoreiOptions from "./classes/TexturesPixelStoreiOptions.js";
+import {prepareTextures} from "./pureFunctions/webGL/textures.js";
+import {separateImagesAndShaders} from "./pureFunctions/loadImagesAndShaders.js";
+
+
+
+const shader_vertex_source1Url = './pureFunctions/shaders/shader_vertex_source1.glsl';
+const shader_fragment_source1Url = './pureFunctions/shaders/shader_fragment_source1.glsl';
+
+
+const lakeBackAndMoonUrlImages = [
+  "textures/lake/back.jpg",
+  "textures/moon.jpg"
+];
 let moonAndLakeTex;
-let moonSettings;
-
-function loadImage(url, callback) {
-	const image = new Image();
-	image.src = url;
-	image.onload = callback;
-	return image;
-}
-
-function loadImages(urls, callback) {
-	const images = [];
-	let imagesToLoad = urls.length;
-	const onImageLoad = function() {
-		--imagesToLoad;
-		if (imagesToLoad == 0) {
-			callback(images);
-			mainCube(); // when images to texture mooonLake is loaded then draw skybox
-		}
-	};
-
-	for (let ii = 0; ii < imagesToLoad; ++ii) {
-		const image = loadImage(urls[ii], onImageLoad);
-		images.push(image);
-	}
-}
+const moonSettings = {
+  moonMoveLeftRight: 0.25,
+  moonMoveUpDown: 0.5,
+  moonSizeChange: 5,
+  moonMoveSizeCorrectionLeftRight: 0.0,
+  moonMoveSizeCorrectionUpDown: 0.0,
+  moonLessR: 1.0,
+  moonMoreR: 0.0,
+  moonLessG: 1.0,
+  moonMoreG: 0.0,
+  moonLessB: 1.0,
+  moonMoreB: 0.0,
+  lakeLessR: 0.53,
+  lakeMoreR: 0.20,
+  lakeLessG: 1.0,
+  lakeMoreG: 0.0,
+  lakeLessB: 1.0,
+  lakeMoreB: 0.0,
+  zoom: 40,
+};
 
 function main() {
-	loadImages([
-		"textures/lake/back.jpg",
-		"textures/moon.jpg"
-	], render);
+  loadImagesAndShaders([...lakeBackAndMoonUrlImages, shader_vertex_source1Url, shader_fragment_source1Url])
+    .then(imagesAndShaders => {
+      const {shaders, images} = separateImagesAndShaders(imagesAndShaders);
+      render(images, ...shaders)})
+    .then(() => mainCube())
 }
 
-function render(images) {
+function render(images, shader_vertex_source1, shader_fragment_source1) {
+  const canvasOptions = {
+    preserveDrawingBuffer: true,
+    alpha: false,
+    premultipliedAlpha: false  // Ask for non-premultiplied alpha
+  };
 
-	const canvasTexture = document.getElementById("cool_canvas");
-	const gl = canvasTexture.getContext("webgl", {
-		preserveDrawingBuffer: true,
-		alpha: false,
-		premultipliedAlpha: false  // Ask for non-premultiplied alpha
-	});
-	// this code is not necessary when in index.html  "cool_canvas" have width="2048" height="2048"
-	/*let width = gl.canvas.width;
-	let height = gl.canvas.height;
-	canvasTexture.width = width;
-	canvasTexture.height = height;*/
+  const [canvasBackLakeWithMoon, gl] = createCanvas(
+    "moon_canvas",
+    "webgl",
+    canvasOptions,
+    `canvas.width`,
+    `canvas.height`
+  );
 
-		/*========================= SHADERS1 ========================= */
-	const shader_vertex_source1 = `
-		attribute vec3 position;
-		uniform mat4 Pmatrix;
-		uniform mat4 Vmatrix;
-		uniform mat4 Mmatrix;
-		attribute vec2 uv;
-		varying vec2 vUV;
-	
-		void main(void) {
-			vUV = uv;
-			gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1);
-		}`;
+   draw();
 
-	const shader_fragment_source1 = `
-		precision mediump float;
-		uniform sampler2D u_image0;
-		uniform sampler2D u_image1;
-		uniform bool image1Load;
-		uniform float moonSize;
-		uniform vec2 moonMove;
-		uniform vec2 moonMoveSizeCorrection;
-		
-		uniform float moonLessR;
-		uniform float moonMoreR;
-		uniform float moonLessG;
-		uniform float moonMoreG;
-		uniform float moonLessB;
-		uniform float moonMoreB;
-		uniform float lakeLessR;
-		uniform float lakeMoreR;
-		uniform float lakeLessG;
-		uniform float lakeMoreG;
-		uniform float lakeLessB;
-		uniform float lakeMoreB;
-				
-		varying vec2 vUV;
-	
-		void main(void) {
-			vec4 color0 = texture2D(u_image0, vUV);
-				
-			gl_FragColor = color0;
-			if (image1Load) {
-			vec4 color1 = texture2D(u_image1, (vUV - moonMove) * moonSize - moonMoveSizeCorrection );
-				if (color0.r < lakeLessR &&
-						color0.r > lakeMoreR &&
-						color0.g < lakeLessG &&
-						color0.g > lakeMoreG &&
-				 		color0.b < lakeLessB &&
-				 		color0.b > lakeMoreB &&
-
-				 		color1.r < moonLessR &&
-						color1.r > moonMoreR &&
-						color1.g < moonLessG &&
-						color1.g > moonMoreG &&
-				 		color1.b < moonLessB &&
-				 		color1.b > moonMoreB)
-				discard;
-				gl_FragColor = color1;
-			}
-		}`;
-
-	const get_shader1 = function (source, type, typeString) {
-		const shader = gl.createShader(type);
-		gl.shaderSource(shader, source);
-		gl.compileShader(shader);
-		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-			alert("ERROR IN " + typeString + "SHADER : " + gl.getShaderInfoLog(shader));
-			return false;
-		}
-		return shader;
-	};
-
-	const shader_vertex1= get_shader1(shader_vertex_source1, gl.VERTEX_SHADER, "VERTEX");
-	const shader_fragment1 = get_shader1(shader_fragment_source1, gl.FRAGMENT_SHADER, "FRAGMENT");
-
-	/*========================Moon settings ======================*/
-	moonSettings = {
-		moonMoveLeftRight: 0.25,
-		moonMoveUpDown: 0.5,
-		moonSizeChange: 5,
-		moonMoveSizeCorrectionLeftRight: 0.0,
-		moonMoveSizeCorrectionUpDown: 0.0,
-		moonLessR: 1.0,
-		moonMoreR: 0.0,
-		moonLessG: 1.0,
-		moonMoreG: 0.0,
-		moonLessB: 1.0,
-		moonMoreB: 0.0,
-		lakeLessR: 0.53,
-		lakeMoreR: 0.20,
-		lakeLessG: 1.0,
-		lakeMoreG: 0.0,
-		lakeLessB: 1.0,
-		lakeMoreB: 0.0,
-		zoom: 40,
-	};
-
-	draw();
-	window.addEventListener("resize", function() {
+  window.addEventListener("resize", function() {
 		mainCube(true, THETA, PHI, old_x, old_y, true);
 	});
 
@@ -188,7 +108,7 @@ function render(images) {
 				moonSettings[index] = value;
 			}
 
-			draw();
+      draw();
 			mainCube(true, THETA, PHI, old_x, old_y); //drawing the cube with new moon change and delete texture at the end - memory used not rise
 		}
 
@@ -226,54 +146,37 @@ function render(images) {
 
 
 	function draw() {
-		const SHADER_PROGRAM1 = gl.createProgram();
-		gl.attachShader(SHADER_PROGRAM1, shader_vertex1);
-		gl.attachShader(SHADER_PROGRAM1, shader_fragment1);
 
-		gl.linkProgram(SHADER_PROGRAM1);
+    const SHADER_PROGRAM1 = getProgram(gl, shader_vertex_source1, shader_fragment_source1);
 
-		const _Pmatrix1 = gl.getUniformLocation(SHADER_PROGRAM1, "Pmatrix");
-		const _Vmatrix1 = gl.getUniformLocation(SHADER_PROGRAM1, "Vmatrix");
-		const _Mmatrix1 = gl.getUniformLocation(SHADER_PROGRAM1, "Mmatrix");
+    const glUniforms = [
+      "Pmatrix", "Vmatrix", "Mmatrix", "u_image0", "u_image1", "image1Load", "moonSize",
+      "moonMove", "moonMoveSizeCorrection", "moonLessR", "moonMoreR", "moonLessG", "moonMoreG",
+      "moonLessB", "moonMoreB", "lakeLessR", "lakeMoreR", "lakeLessG", "lakeMoreG", "lakeLessB",
+      "lakeMoreB"
+    ];
 
-		const _uv = gl.getAttribLocation(SHADER_PROGRAM1, "uv");
-		const _u_image0 = gl.getUniformLocation(SHADER_PROGRAM1, "u_image0");
-		const _u_image1 = gl.getUniformLocation(SHADER_PROGRAM1, "u_image1");
-		const _position1 = gl.getAttribLocation(SHADER_PROGRAM1, "position");
+    const [
+      _Pmatrix, _Vmatrix, _Mmatrix, _u_image0, _u_image1, _image1Load, _moonSize,
+      _moonMove, _moonMoveSizeCorrection, _moonLessR, _moonMoreR, _moonLessG, _moonMoreG,
+      _moonLessB, _moonMoreB, _lakeLessR, _lakeMoreR, _lakeLessG, _lakeMoreG, _lakeLessB,
+      _lakeMoreB
+    ] = glUniforms.map((uniform) => gl.getUniformLocation(SHADER_PROGRAM1, uniform));
 
-		const _image1Load = gl.getUniformLocation(SHADER_PROGRAM1, "image1Load");
-		const _moonSize = gl.getUniformLocation(SHADER_PROGRAM1, "moonSize");
-		const _moonMove = gl.getUniformLocation(SHADER_PROGRAM1, "moonMove");
+    const glAttrib = [
+      "uv",
+      "position",
+    ];
 
-		const _moonMoveSizeCorrection = gl.getUniformLocation(SHADER_PROGRAM1, "moonMoveSizeCorrection");
-
-		const _moonLessR = gl.getUniformLocation(SHADER_PROGRAM1, "moonLessR");
-		const _moonMoreR = gl.getUniformLocation(SHADER_PROGRAM1, "moonMoreR");
-		const _moonLessG = gl.getUniformLocation(SHADER_PROGRAM1, "moonLessG");
-		const _moonMoreG = gl.getUniformLocation(SHADER_PROGRAM1, "moonMoreG");
-		const _moonLessB = gl.getUniformLocation(SHADER_PROGRAM1, "moonLessB");
-		const _moonMoreB = gl.getUniformLocation(SHADER_PROGRAM1, "moonMoreB");
-
-		const _lakeLessR = gl.getUniformLocation(SHADER_PROGRAM1, "lakeLessR");
-		const _lakeMoreR = gl.getUniformLocation(SHADER_PROGRAM1, "lakeMoreR");
-		const _lakeLessG = gl.getUniformLocation(SHADER_PROGRAM1, "lakeLessG");
-		const _lakeMoreG = gl.getUniformLocation(SHADER_PROGRAM1, "lakeMoreG");
-		const _lakeLessB = gl.getUniformLocation(SHADER_PROGRAM1, "lakeLessB");
-		const _lakeMoreB = gl.getUniformLocation(SHADER_PROGRAM1, "lakeMoreB");
-
-		gl.enableVertexAttribArray(_uv);
-		gl.enableVertexAttribArray(_position1);
+    const [ _uv, _position1 ] = glAttrib.map((uniform) => {
+      const uniformVar = gl.getAttribLocation(SHADER_PROGRAM1, uniform);
+      gl.enableVertexAttribArray(uniformVar);
+      return uniformVar
+    });
 
 		gl.useProgram(SHADER_PROGRAM1);
 
-		function sizeSquareImage(x, y, z, moveX, moveY) {
-			return [
-				-x+moveX,-y+moveY,-z,    0,0,
-				x+moveX,-y+moveY,-z,     1,0,
-				x+moveX, y+moveY,-z,     1,1,
-				-x+moveX, y+moveY,-z,    0,1
-			]
-		}
+
 
 		const cube_vertex1 = [
 			...sizeSquareImage(1, 1, 1, 0, 0),
@@ -284,7 +187,7 @@ function render(images) {
 			0,2,3,
 		];
 
-		const PROJMATRIX1 = LIBS.get_projection(40, canvasTexture.width/canvasTexture.height, 1, 100),
+		const PROJMATRIX1 = LIBS.get_projection(40, canvasBackLakeWithMoon.width/canvasBackLakeWithMoon.height, 1, 100),
 					MOVEMATRIX1 = LIBS.get_I4(),
 					VIEWMATRIX1 = LIBS.get_I4();
 
@@ -292,32 +195,36 @@ function render(images) {
 		LIBS.set_I4(MOVEMATRIX1);
 
 		/*========================= TEXTURE1 ========================= */
-		let textures = [];
 
-		for (let ii = 0; ii < images.length; ++ii) {
-			const texture = gl.createTexture();
+    const texImage2dOptions = new TexImage2dOptions(
+      gl,
+      gl.TEXTURE_2D
+    );
+    const texParameteriOptions = new TexParameteriOptions(
+      gl,
+      gl.CLAMP_TO_EDGE,
+      gl.CLAMP_TO_EDGE,
+      gl.LINEAR,
+      gl.LINEAR
+      );
+    const texturesPixelStoreiOptions = new TexturesPixelStoreiOptions(
+      gl,
+      true,
+      true
+    );
 
-			gl.bindTexture(gl.TEXTURE_2D, texture);
-			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-			gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-
-			// Set the parameters so we can render any size image.
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-			// Upload the image into the texture.
-			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, images[ii]);
-
-			textures.push(texture);
-		}
+    const textures = prepareTextures(
+      images,
+      texImage2dOptions,
+      texParameteriOptions,
+      texturesPixelStoreiOptions
+    );
 
 		const CUBE_VERTEX1 = gl.createBuffer();
 		const CUBE_FACES1 = gl.createBuffer();
 
 		/*========================= DRAWING ========================= */
-		gl.viewport(0.0, 0.0, canvasTexture.width, canvasTexture.height);
+		gl.viewport(0.0, 0.0, canvasBackLakeWithMoon.width, canvasBackLakeWithMoon.height);
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
 		gl.enable(gl.DEPTH_TEST);
@@ -351,9 +258,9 @@ function render(images) {
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_COLOR);
 		gl.blendEquation(gl.FUNC_ADD);
 
-		gl.uniformMatrix4fv(_Pmatrix1, false, PROJMATRIX1);
-		gl.uniformMatrix4fv(_Vmatrix1, false, VIEWMATRIX1);
-		gl.uniformMatrix4fv(_Mmatrix1, false, MOVEMATRIX1);
+		gl.uniformMatrix4fv(_Pmatrix, false, PROJMATRIX1);
+		gl.uniformMatrix4fv(_Vmatrix, false, VIEWMATRIX1);
+		gl.uniformMatrix4fv(_Mmatrix, false, MOVEMATRIX1);
 
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, CUBE_VERTEX1);
@@ -381,7 +288,7 @@ function render(images) {
 		gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
 		gl.flush();
-		moonAndLakeTex = canvasTexture;
+		moonAndLakeTex = canvasBackLakeWithMoon;
 
 		// clean memory - important!!
 		gl.deleteTexture(textures[0]);
